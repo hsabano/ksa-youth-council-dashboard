@@ -10,13 +10,25 @@ Static dashboard (HTML, CSS, JavaScript; no build step) showing the council's in
 | `index.html` | Page shell: sidebar, header, dialog |
 | `style.css` | Layout, colours, responsive rules |
 | `app.js` | Routing, filters, calculations, metric explanation cards |
-| `data.js` | Snapshot data (sample, 25 Nov 2026) and metric definitions |
+| `data-sample.js` | Fully filled sample data set (placeholder names), built by `tools/make_sample.py` |
+| `data.js` | Live data set, built by `tools/build_data.py`. Empty (`null`) in this public repository |
 | `logo.jpg` | Council logo |
 | `netlify.toml` | Publishes the repository root as-is, no build command |
 | `robots.txt` | Asks search engines not to index the site |
 
+## Sample / live toggle
+The switch at the top of every page chooses the data set. The choice is remembered per browser. **Live** is disabled when `data.js` holds no data.
+
 ## Deploy
 Netlify deploys automatically from `main`. To preview locally, open `index.html` in a browser or run `python3 -m http.server 8000`.
+
+## Refreshing with real data
+1. Export the Planner plan to Excel (Planner › … › Export plan to Excel).
+2. Update the Council Data workbook (Metrics month column, Participants, Survey Results).
+3. Run `python3 tools/build_data.py PLANNER_EXPORT.xlsx COUNCIL_DATA.xlsx -o data.js` (needs `pip install openpyxl`). To rebuild the sample, run `python3 tools/make_sample.py BLANK_TEMPLATE.xlsx`.
+4. Fix anything listed under "Data health", then rerun.
+
+**A data.js built from real data contains real names and results. Do not commit it while this repository is public.**
 
 ## Change process
 Changes are previewed and approved before they are pushed to `main`.

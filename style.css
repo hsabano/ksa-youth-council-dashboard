@@ -15,3 +15,5 @@ html,:root{color-scheme:light!important}dialog{background:#fff;color:#091b3b;col
 
 
 aside{overflow-y:auto}
+
+.dsw{display:inline-flex;background:#eef2f9;border:1px solid #dbe2ed;border-radius:999px;padding:3px;gap:2px}.dsw button{border:0;background:none;border-radius:999px;padding:5px 12px;font-size:12px;font-weight:650;color:#52637b;display:inline-flex;align-items:center;gap:7px}.dsw button:before{content:'';width:7px;height:7px;border-radius:50%;background:#b9c4d8}.dsw button.on{background:#fff;color:#091b3b;box-shadow:0 1px 3px #091b3b26}.dsw button.on[data-ds=sample]:before{background:#c6ea39}.dsw button.on[data-ds=live]:before{background:#1e9e5a}.dsw button:disabled{opacity:.45;cursor:not-allowed}.dsw button:not(.on):not(:disabled):hover{color:#091b3b}
