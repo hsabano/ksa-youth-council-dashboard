@@ -5,16 +5,19 @@ Static dashboard (HTML, CSS, JavaScript; no build step) showing the council's in
 **This repository is public. It holds anonymised sample data only.** Team members appear as "Member A–J". Do not commit real names, Planner exports or the Council Data workbook.
 
 ## Files
-| File | Purpose |
+| Path | Purpose |
 |---|---|
-| `index.html` | Page shell: sidebar, header, dialog |
-| `style.css` | Layout, colours, responsive rules |
-| `app.js` | Routing, filters, calculations, metric explanation cards |
-| `data-sample.js` | Fully filled sample data set (placeholder names), built by `tools/make_sample.py` |
-| `data.js` | Live data set, built by `tools/build_data.py`. Empty (`null`) in this public repository |
-| `logo.jpg` | Council logo |
-| `netlify.toml` | Publishes the repository root as-is, no build command |
-| `robots.txt` | Asks search engines not to index the site |
+| `site/` | The website Netlify publishes: `index.html`, `style.css`, `app.js`, logo and icons |
+| `site/data-sample.js` | Fully filled sample data set (placeholder names), built by `tools/make_sample.py` |
+| `site/data.js` | Optional static live data; `null` here. Live data normally comes from uploads (below) |
+| `site/upload.js`, `site/convert.js` | Upload Data page: reads and checks the two Excel files in the browser |
+| `site/vendor/xlsx.full.min.js` | SheetJS 0.18.5 (Apache-2.0) for reading Excel files |
+| `site/Council_Data_Template.xlsx` | Blank Council Data template offered for download |
+| `netlify/functions/` | `data.mts` serves live data (`GET /api/data`); `upload.mts` publishes it (`POST /api/upload`, passcode) |
+| `tools/` | Offline converter (`build_data.py`) and sample builder (`make_sample.py`) |
+
+## Uploading live data
+Sidebar footer › **Upload data**. Choose the Planner export and the Council Data workbook; the page checks both and lists anything that must be fixed. When all checks pass, enter the upload passcode and publish. Live data is stored in Netlify Blobs, never in this repository. The passcode is the `UPLOAD_PASSCODE` environment variable in Netlify (scope: Functions).
 
 ## Sample / live toggle
 The switch at the top of every page chooses the data set. The choice is remembered per browser. **Live** is disabled when `data.js` holds no data.

@@ -139,4 +139,4 @@ if __name__ == "__main__":
     pl, cw = os.path.join(OUT, "Planner_Sample.xlsx"), os.path.join(OUT, "Council_Data_Sample.xlsx")
     planner_export(pl); council_workbook(sys.argv[1], cw)
     subprocess.run([sys.executable, os.path.join(HERE, "build_data.py"), pl, cw, "--sample",
-                    "-o", os.path.join(os.path.dirname(HERE), "data-sample.js")], check=True)
+                    "-o", os.path.join(os.path.dirname(HERE), "site", "data-sample.js")], check=True)
