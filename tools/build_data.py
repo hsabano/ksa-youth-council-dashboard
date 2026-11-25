@@ -174,7 +174,7 @@ def main():
         rec = {"id": mid, "init": ini, "level": clean(g("Level")), "name": clean(g("Metric")), "unit": unit,
                "target": num(g("Target")), "series": series, "note": clean(g("Latest note")),
                "def": clean(g("Definition (shown on hover)")), "how": clean(g("How it’s calculated")), "src": clean(src),
-               "n": num(g("Responses")), "overview": clean(g("Feeds overview measure")), "survey": "survey" in clean(src).lower()}
+               "feeds": clean(g("Feeds pillar KPI")), "n": num(g("Responses")), "overview": clean(g("Feeds overview measure")), "survey": "survey" in clean(src).lower()}
         rec["actual"] = series[-1][1] if series else None
         if clean(g("Status")) == "Dropped": continue
         idx = next((i for i, it in enumerate(inits) if it["name"] == ini), None)
@@ -206,16 +206,23 @@ def main():
     kh = {}
     for c in kws[4]:
         if c.value: kh.setdefault(clean(c.value), c.column)  # first column with a given header wins
-    kpis, kpi_no_target = [[] for _ in PILLARS], []
+    kpis, kpi_no_target, kpi_ids = [[] for _ in PILLARS], [], set()
     for r in range(5, kws.max_row + 1):
         kid = clean(kws.cell(r, kh["KPI ID"]).value)
         if not kid or is_example(kid, kws.cell(r, kh["Pillar"]).value): continue
         g = lambda h: kws.cell(r, kh[h]).value if h in kh else None
         pname = clean(g("Pillar"))
         if pname not in [p["name"] for p in PILLARS]: warn(f"KPI {kid}: unknown pillar."); continue
-        links = [by_id.get(clean(g(h))) for h in ("Fed by metric 1", "Fed by metric 2") if clean(g(h))]
-        if any(l is None for l in links) or not links: warn(f"KPI {kid}: linked metric not found."); links = [l for l in links if l]
         agg = clean(g("Aggregation")) or "Single"
+        if "Fed by metric 1" in kh:  # earlier template versions linked metrics on the Pillar KPIs tab
+            links = [by_id.get(clean(g(h))) for h in ("Fed by metric 1", "Fed by metric 2") if clean(g(h))]
+            if any(l is None for l in links): warn(f"KPI {kid}: linked metric not found."); links = [l for l in links if l]
+        else:
+            links = [m for m in by_id.values() if m["feeds"] == kid]
+        if not links: warn(f"KPI {kid}: no metric feeds it yet (pick it in 'Feeds pillar KPI' on the Metrics tab).")
+        if agg == "Single" and len(links) > 1:
+            warn(f"KPI {kid}: Aggregation is Single but {len(links)} metrics feed it; only {links[0]['id']} is used."); links = links[:1]
+        kpi_ids.add(kid)
         def combine(vals):
             vals = [v for v in vals if v is not None]
             if not vals: return None
@@ -241,6 +248,9 @@ def main():
             "src": links[0]["src"] if links else "", "from": [c for c in chips if c],
             "inits": sorted({int(c.split(":")[1]) for c in chips if c})})
 
+    for m in by_id.values():
+        if m.get("feeds") and m["feeds"] not in kpi_ids and "Fed by metric 1" not in kh:
+            warn(f"Metric {m['id']}: feeds KPI {m['feeds']}, which is not on the Pillar KPIs tab.")
     if kpi_no_target: warn(f"{len(kpi_no_target)} pillar KPI(s) have no target, so they are left out of the pillar score: {', '.join(kpi_no_target)}.")
     # ---- pillar scores now and per month (for sparkline and trend)
     def kpi_value(k, upto=None):

@@ -65,8 +65,9 @@
     const M = sheetAPI(councilBook.Sheets.Metrics), K = sheetAPI(councilBook.Sheets['Pillar KPIs']);
     const mh = M.head(4), kh = K.head(4), psh = PS.head(4), sh = S.head(4);
     const need = (h, cols, where) => { const miss = cols.filter(c => !(c in h)); if (miss.length) err(where, `Column(s) missing or renamed: ${miss.join(', ')}.`, 'Use the latest template from this page and do not rename the header row (row 4).') };
-    need(mh, ['Metric ID', 'Initiative', 'Level', 'Metric', 'Unit', 'Target', 'Status', 'Data source', 'Responses', 'Feeds overview measure', 'Latest note', 'Definition (shown on hover)', 'How it’s calculated'], `${files[1]} › Metrics`);
-    need(kh, ['KPI ID', 'Pillar', 'KPI', 'Fed by metric 1', 'Fed by metric 2', 'Aggregation', 'Target override', 'Definition (shown on hover)'], `${files[1]} › Pillar KPIs`);
+    const oldLinks = 'Fed by metric 1' in kh;  // earlier template versions linked metrics on the Pillar KPIs tab
+    need(mh, ['Metric ID', 'Initiative', 'Level', 'Metric', 'Unit', 'Target', 'Status', 'Data source', 'Responses', 'Feeds overview measure', 'Latest note', 'Definition (shown on hover)', 'How it’s calculated'].concat(oldLinks ? [] : ['Feeds pillar KPI']), `${files[1]} › Metrics`);
+    need(kh, ['KPI ID', 'Pillar', 'KPI', 'Aggregation', 'Target override', 'Definition (shown on hover)'].concat(oldLinks ? ['Fed by metric 2'] : []), `${files[1]} › Pillar KPIs`);
     need(psh, ['Initiative (dashboard name)', 'Current Planner bucket', 'Pillar', 'Focal point(s)'], `${files[1]} › Planner Setup`);
     need(sh, ['Setting', 'Value'], `${files[1]} › Settings`);
     if (errors.length) return { errors, warnings };
@@ -171,7 +172,7 @@
       }
       if (n != null && (n < 0 || Math.round(n) !== n)) err(where, `Responses “${n}” must be a whole number.`, 'Type how many people answered, e.g. 48.');
       const src = clean(g(r, 'Data source')), survey = /survey/i.test(src);
-      const rec = { id, ini, level, unit, target, series, n, src, survey, name: clean(g(r, 'Metric')), note: clean(g(r, 'Latest note')), def: clean(g(r, 'Definition (shown on hover)')), how: clean(g(r, 'How it’s calculated')), overview: clean(g(r, 'Feeds overview measure')) };
+      const rec = { id, ini, level, unit, target, series, n, src, survey, feeds: oldLinks ? '' : clean(g(r, 'Feeds pillar KPI')), row: r, name: clean(g(r, 'Metric')), note: clean(g(r, 'Latest note')), def: clean(g(r, 'Definition (shown on hover)')), how: clean(g(r, 'How it’s calculated')), overview: clean(g(r, 'Feeds overview measure')) };
       rec.actual = series.length ? series[series.length - 1][1] : null;
       if (level === 'Time' && idx >= 0) {
         const ts = raw.filter(t => t.i === idx), end = inits[idx].end;
@@ -190,27 +191,37 @@
     if (noActual.length) warn(`${noActual.length} metric(s) have no actual up to ${fmtMY(asOf)}: ${noActual.join(', ')}.`);
 
     // ---------- pillar KPIs ----------
-    const kpis = PILLARS.map(() => []), kNoTarget = [];
+    const kpis = PILLARS.map(() => []), kNoTarget = [], kpiIds = new Set();
     const kg = (r, h) => K.val(r, kh[h]);
     for (let r = 5; r <= K.rows; r++) {
       const id = clean(kg(r, 'KPI ID')); if (!id || isExample(id, kg(r, 'Pillar'))) continue;
       const where = `${files[1]} › Pillar KPIs, row ${r} (${id})`, pname = clean(kg(r, 'Pillar'));
       if (!PNAMES.includes(pname)) { err(where, `Pillar “${pname}” is not one of the three strategic pillars.`, 'Pick a pillar from the drop-down.'); continue }
-      const ids = ['Fed by metric 1', 'Fed by metric 2'].map(h => clean(kg(r, h))).filter(Boolean);
-      if (!ids.length) { err(where, 'No metric is linked.', 'Pick the Metric ID that feeds this KPI in “Fed by metric 1”.'); continue }
-      const bad = ids.filter(x => !byId[x]); if (bad.length) { err(where, `Linked metric ${bad.join(', ')} does not exist (or is Dropped).`, 'Pick a Metric ID from the drop-down.'); continue }
-      const agg = clean(kg(r, 'Aggregation')) || 'Single', links = ids.map(x => byId[x]);
+      if (kpiIds.has(id)) { err(where, `KPI ID ${id} is used twice.`, 'Give every pillar KPI a unique ID.'); continue }
+      kpiIds.add(id);
+      const agg = clean(kg(r, 'Aggregation')) || 'Single';
       if (!['Single', 'Sum', 'Average'].includes(agg)) { err(where, `Aggregation “${agg}” is not recognised.`, 'Pick Single, Sum or Average.'); continue }
-      if (agg !== 'Single' && links.length < 2) { err(where, `Aggregation is ${agg} but only one metric is linked.`, 'Add “Fed by metric 2”, or set Aggregation to Single.'); continue }
+      let links;
+      if (oldLinks) {
+        const ids = ['Fed by metric 1', 'Fed by metric 2'].map(h => clean(kg(r, h))).filter(Boolean);
+        const bad = ids.filter(x => !byId[x]); if (bad.length) { err(where, `Linked metric ${bad.join(', ')} does not exist (or is Dropped).`, 'Pick a Metric ID from the drop-down.'); continue }
+        links = ids.map(x => byId[x]);
+      } else links = Object.values(byId).filter(m => m.feeds === id);
+      if (!links.length) { warn(`KPI ${id} (${clean(kg(r, 'KPI'))}): no metric feeds it yet, so it shows no data. Pick it in “Feeds pillar KPI” on the Metrics tab.`) }
+      if (agg === 'Single' && links.length > 1) { err(where, `Aggregation is Single but ${links.length} metrics feed this KPI (${links.map(l => l.id).join(', ')}).`, 'On the Metrics tab keep “Feeds pillar KPI” = ' + id + ' on one metric only, or set Aggregation to Sum or Average here.'); continue }
+      const kpPillar = PNAMES.indexOf(pname);
+      links.forEach(l => { const ii = inits.findIndex(i => i.name === l.ini); if (ii >= 0 && inits[ii].pillar !== kpPillar) warn(`Metric ${l.id} (${l.ini}, ${PNAMES[inits[ii].pillar]}) feeds ${id}, a ${pname} KPI: a metric normally feeds its own initiative’s pillar.`) });
       const combine = vals => { vals = vals.filter(v => v != null); if (!vals.length) return null; return agg === 'Sum' ? vals.reduce((a, b) => a + b, 0) : agg === 'Average' ? vals.reduce((a, b) => a + b, 0) / vals.length : vals[0] };
       let target = num(kg(r, 'Target override'));
+      if (!links.length) { kpis[kpPillar].push({ id, name: clean(kg(r, 'KPI')), unit: '', target: isNaN(target) ? null : target, links: [], combine: () => null, def: clean(kg(r, 'Definition (shown on hover)')), how: 'No metric feeds this KPI yet.', src: '', from: [], inits: [] }); continue }
       if (isNaN(target)) { err(where, `Target override “${kg(r, 'Target override')}” is not a number.`, 'Type a number or leave it empty.'); continue }
-      if (target == null) { const lt = links.map(l => l.target); if (lt.every(x => x != null)) target = agg === 'Sum' ? lt.reduce((a, b) => a + b, 0) : agg === 'Average' ? lt.reduce((a, b) => a + b, 0) / lt.length : lt[0] }
+      if (target == null) { const lt = links.map(l => l.target); if (lt.length && lt.every(x => x != null)) target = agg === 'Sum' ? lt.reduce((a, b) => a + b, 0) : agg === 'Average' ? lt.reduce((a, b) => a + b, 0) / lt.length : lt[0] }
       if (target == null) kNoTarget.push(id);
       const chips = links.map(l => l.ref).filter(Boolean);
       const how = links.length && chips.length === links.length ? (agg === 'Single' || chips.length === 1 ? 'Equals ' : agg === 'Sum' ? 'Sum of ' : 'Average of ') + chips.map(c => `{${c}}`).join(' and ') + '.' : (links[0].how || 'Council-wide measure.');
       kpis[PNAMES.indexOf(pname)].push({ id, name: clean(kg(r, 'KPI')), unit: links[0].unit, target, links, combine, def: clean(kg(r, 'Definition (shown on hover)')), how, src: links[0].src, from: chips, inits: [...new Set(chips.map(c => +c.split(':')[1]))].sort() });
     }
+    if (!oldLinks) Object.values(byId).forEach(m => { if (m.feeds && !kpiIds.has(m.feeds)) err(`${files[1]} › Metrics, row ${m.row} (${m.id})`, `“Feeds pillar KPI” is ${m.feeds}, but there is no such KPI on the Pillar KPIs tab.`, 'Pick a KPI ID from the drop-down, or add that KPI on the Pillar KPIs tab first.') });
     if (kNoTarget.length) warn(`${kNoTarget.length} pillar KPI(s) have no target, so they are left out of the pillar score: ${kNoTarget.join(', ')}.`);
     if (errors.length) return { errors, warnings };
 
